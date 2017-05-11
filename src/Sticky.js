@@ -1,6 +1,7 @@
 import React, { Component } from 'react';
 import ReactDOM from 'react-dom';
 import PropTypes from 'prop-types';
+import { Edges } from './Constants';
 
 export default class Sticky extends Component {
 
@@ -8,7 +9,8 @@ export default class Sticky extends Component {
     topOffset: PropTypes.number,
     bottomOffset: PropTypes.number,
     relative: PropTypes.bool,
-    children: PropTypes.func.isRequired
+    children: PropTypes.func.isRequired,
+    edge: PropTypes.number
   }
 
   static defaultProps = {
@@ -16,7 +18,8 @@ export default class Sticky extends Component {
     topOffset: 0,
     bottomOffset: 0,
     disableCompensation: false,
-    disableHardwareAcceleration: false
+    disableHardwareAcceleration: false,
+    edge: Edges.TOP
   }
 
   static contextTypes = {
@@ -64,13 +67,36 @@ export default class Sticky extends Component {
     const isSticky = preventingStickyStateChanges ? wasSticky : (distanceFromTop <= -this.props.topOffset && distanceFromBottom > -this.props.bottomOffset);
 
     distanceFromBottom = (this.props.relative ? parent.scrollHeight - parent.scrollTop : distanceFromBottom) - calculatedHeight;
+    
+    let isSticky = false;
+    let topValue = 0;
+
+    if (this.props.edge == Edges.TOP) {
+        isSticky = preventingStickyStateChanges ? wasSticky : (distanceFromTop < -this.props.topOffset && distanceFromBottom > -this.props.bottomOffset);
+
+        const bottomDifference = distanceFromBottom - this.props.bottomOffset - calculatedHeight;
+        console.log('parent.offsetTop', parent.offsetTop);
+        console.log('parent.offsetParent.scrollTop', parent.offsetParent.scrollTop);
+        topValue = bottomDifference > 0 ? (this.props.relative ? parent.offsetTop - parent.offsetParent.scrollTop : 0) : bottomDifference;
+    } else if(this.props.edge == Edges.BOTTOM) {
+      const viewportHeight = window.innerHeight;
+      const containerHeight = parent.getBoundingClientRect().height;
+      isSticky = preventingStickyStateChanges ? wasSticky : distanceFromTop + this.props.topOffset < viewportHeight && distanceFromBottom + calculatedHeight - this.props.bottomOffset> 0;
+
+      const footerDynamicTopValue = distanceFromTop + this.props.topOffset;
+      const footerStaticValue = viewportHeight - calculatedHeight;
+
+      const footerTopValue = Math.max(footerDynamicTopValue, footerStaticValue);
+      const footerBottomValue = distanceFromBottom - this.props.bottomOffset;
+      topValue = footerBottomValue + calculatedHeight < viewportHeight ? footerBottomValue : footerTopValue;
+    }
 
     const style = !isSticky ? { } : {
       position: 'fixed',
-      top: bottomDifference > 0 ? (this.props.relative ? parent.offsetTop - parent.offsetParent.scrollTop : 0) : bottomDifference,
+      top: topValue,
       left: placeholderClientRect.left,
       width: placeholderClientRect.width
-    }
+    };
 
     if (!this.props.disableHardwareAcceleration) {
       style.transform = 'translateZ(0)';
